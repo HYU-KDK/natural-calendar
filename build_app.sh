@@ -2,7 +2,7 @@
 echo "📦 자연어 캘린더 앱 빌드 시작..."
 
 # 패키지 설치
-pip3 install rumps google-genai pyinstaller
+pip3 install rumps groq pyinstaller
 
 # PyInstaller로 .app 빌드 (rumps가 설치된 Python 사용)
 /Library/Developer/CommandLineTools/usr/bin/python3 -m PyInstaller \

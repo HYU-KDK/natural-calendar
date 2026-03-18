@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import rumps
-from google import genai
+from groq import Groq
 import subprocess
 import json
 from datetime import datetime
@@ -68,15 +68,14 @@ class CalendarApp(rumps.App):
             self.first_setup()
 
     def first_setup(self):
-        # 환영 안내
         rumps.alert(
             title="📅 자연어 캘린더에 오신 걸 환영해요!",
             message=(
                 "자연어로 일정을 입력하면\n"
                 "AI가 분석해서 캘린더에 저장해줘요.\n\n"
-                "시작하려면 무료 Gemini API 키가 필요해요.\n\n"
-                "① aistudio.google.com/apikey 접속\n"
-                "② 'Create API key' 클릭\n"
+                "시작하려면 무료 Groq API 키가 필요해요.\n\n"
+                "① console.groq.com 접속 후 회원가입\n"
+                "② 'API Keys' 메뉴 → 'Create API key'\n"
                 "③ 키 복사 후 다음 화면에 붙여넣기"
             )
         )
@@ -85,8 +84,12 @@ class CalendarApp(rumps.App):
     def validate_api_key(self, key):
         """API 키가 실제로 동작하는지 테스트"""
         try:
-            client = genai.Client(api_key=key)
-            client.models.generate_content(model="gemini-2.0-flash", contents="hi")
+            client = Groq(api_key=key)
+            client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": "hi"}],
+                max_tokens=5
+            )
             return True, None
         except Exception as e:
             return False, str(e)
@@ -94,7 +97,7 @@ class CalendarApp(rumps.App):
     def prompt_api_key(self, is_first=False):
         key = ask_input(
             "🔑 API 키 입력",
-            "Gemini API 키를 붙여넣기 하세요.\n(aistudio.google.com/apikey 에서 무료 발급)"
+            "Groq API 키를 붙여넣기 하세요.\n(console.groq.com 에서 무료 발급)"
         )
 
         if key and key.strip():
@@ -102,12 +105,11 @@ class CalendarApp(rumps.App):
             valid, error = self.validate_api_key(key.strip())
 
             if not valid:
-                rumps.alert("❌ API 키 오류", f"키가 유효하지 않아요.\n\n오류: {error}\n\naistudio.google.com/apikey 에서 키를 다시 확인해보세요.")
+                rumps.alert("❌ API 키 오류", f"키가 유효하지 않아요.\n\n오류: {error}\n\nconsole.groq.com 에서 키를 다시 확인해보세요.")
                 return
 
             self.config["api_key"] = key.strip()
 
-            # 캘린더 자동 감지
             if not self.config.get("calendar_name"):
                 self.config["calendar_name"] = get_default_calendar()
 
@@ -144,7 +146,7 @@ class CalendarApp(rumps.App):
 
     def process_events(self, text):
         try:
-            client = genai.Client(api_key=self.config["api_key"])
+            client = Groq(api_key=self.config["api_key"])
             today = datetime.now().strftime("%Y년 %m월 %d일 (%A)")
 
             prompt = f"""오늘은 {today}이야. 아래 텍스트에서 일정들을 추출해서 반드시 JSON 배열 형식으로만 답해줘. 다른 말은 절대 하지 마.
@@ -160,8 +162,11 @@ class CalendarApp(rumps.App):
 
 일정 텍스트: {text}"""
 
-            message = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
-            result = message.text.strip()
+            response = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}]
+            )
+            result = response.choices[0].message.content.strip()
 
             if result.startswith("```"):
                 result = result.split("```")[1]
@@ -252,7 +257,7 @@ class CalendarApp(rumps.App):
                 "iCloud 켜져 있으면 iPhone 캘린더에\n"
                 "자동으로 반영돼요.\n\n"
                 "【API 키 발급 (무료)】\n"
-                "aistudio.google.com/apikey"
+                "console.groq.com"
             )
         )
 
