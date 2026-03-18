@@ -143,8 +143,6 @@ class CalendarApp(rumps.App):
             self.process_events(text.strip())
 
     def process_events(self, text):
-        rumps.notification("📅 일정 분석 중...", "", "Gemini AI가 일정을 분석하고 있어요")
-
         try:
             client = genai.Client(api_key=self.config["api_key"])
             today = datetime.now().strftime("%Y년 %m월 %d일 (%A)")
@@ -162,7 +160,7 @@ class CalendarApp(rumps.App):
 
 일정 텍스트: {text}"""
 
-            message = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+            message = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
             result = message.text.strip()
 
             if result.startswith("```"):
@@ -178,12 +176,15 @@ class CalendarApp(rumps.App):
                 if self.save_to_calendar(event, calendar_name):
                     saved_count += 1
 
-            rumps.notification("✅ 저장 완료!", "", f"{saved_count}개의 일정이 캘린더에 저장됐어요")
+            if saved_count > 0:
+                rumps.alert("✅ 저장 완료!", f"{saved_count}개의 일정이 '{calendar_name}' 캘린더에 저장됐어요.")
+            else:
+                rumps.alert("⚠️ 저장 실패", "캘린더에 저장하지 못했어요.\n\n캘린더 접근 권한을 확인해주세요.\n시스템 설정 → 개인 정보 보호 및 보안 → 캘린더")
 
-        except json.JSONDecodeError:
-            rumps.notification("❌ 오류", "", "일정 파싱에 실패했어요. 다시 시도해주세요.")
+        except json.JSONDecodeError as e:
+            rumps.alert("❌ 파싱 오류", f"AI 응답을 해석하지 못했어요. 다시 시도해주세요.\n\n{str(e)}")
         except Exception as e:
-            rumps.notification("❌ 오류", "", f"오류 발생: {str(e)}")
+            rumps.alert("❌ 오류 발생", str(e))
 
     def save_to_calendar(self, event, calendar_name):
         try:
