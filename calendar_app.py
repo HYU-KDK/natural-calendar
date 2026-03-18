@@ -157,8 +157,12 @@ class CalendarApp(rumps.App):
   ...
 ]
 
-시간이 없으면 time을 "09:00"으로 설정해줘.
-날짜가 "월요일"처럼 요일로 되어있으면 이번주 해당 요일 날짜로 변환해줘.
+규칙:
+- date는 반드시 "2026-03-21" 같은 YYYY-MM-DD 숫자 형식으로만 써. 절대 "토요일", "월요일" 같은 한글을 쓰지 마.
+- "토요일"처럼 요일로 되어있으면 오늘 기준 이번주 해당 요일의 날짜로 계산해서 숫자로 변환해.
+- "내일", "모레"도 오늘 날짜 기준으로 계산해서 숫자로 써.
+- 시간이 없으면 time을 "09:00"으로 설정해줘.
+- "오후 7시부터 9시까지"처럼 종료 시간이 있으면 duration을 분 단위로 계산해줘.
 
 일정 텍스트: {text}"""
 
@@ -177,14 +181,19 @@ class CalendarApp(rumps.App):
             calendar_name = self.config.get("calendar_name") or get_default_calendar()
 
             saved_count = 0
+            errors = []
             for event in events:
-                if self.save_to_calendar(event, calendar_name):
+                success, err = self.save_to_calendar(event, calendar_name)
+                if success:
                     saved_count += 1
+                else:
+                    errors.append(err)
 
             if saved_count > 0:
                 rumps.alert("✅ 저장 완료!", f"{saved_count}개의 일정이 '{calendar_name}' 캘린더에 저장됐어요.")
             else:
-                rumps.alert("⚠️ 저장 실패", "캘린더에 저장하지 못했어요.\n\n캘린더 접근 권한을 확인해주세요.\n시스템 설정 → 개인 정보 보호 및 보안 → 캘린더")
+                error_detail = "\n".join(errors) if errors else "알 수 없는 오류"
+                rumps.alert("⚠️ 저장 실패", f"캘린더: '{calendar_name}'\n\n오류: {error_detail}")
 
         except json.JSONDecodeError as e:
             rumps.alert("❌ 파싱 오류", f"AI 응답을 해석하지 못했어요. 다시 시도해주세요.\n\n{str(e)}")
@@ -232,11 +241,13 @@ class CalendarApp(rumps.App):
                 ["osascript", "-e", applescript],
                 capture_output=True, text=True, timeout=10
             )
-            return result.returncode == 0
+            if result.returncode == 0:
+                return True, None
+            else:
+                return False, result.stderr.strip() or "AppleScript 실행 실패"
 
         except Exception as e:
-            print(f"캘린더 저장 오류: {e}")
-            return False
+            return False, str(e)
 
     @rumps.clicked("도움말")
     def show_help(self, _):
