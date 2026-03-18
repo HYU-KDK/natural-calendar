@@ -82,6 +82,15 @@ class CalendarApp(rumps.App):
         )
         self.prompt_api_key(is_first=True)
 
+    def validate_api_key(self, key):
+        """API 키가 실제로 동작하는지 테스트"""
+        try:
+            client = genai.Client(api_key=key)
+            client.models.generate_content(model="gemini-2.0-flash", contents="hi")
+            return True, None
+        except Exception as e:
+            return False, str(e)
+
     def prompt_api_key(self, is_first=False):
         key = ask_input(
             "🔑 API 키 입력",
@@ -89,6 +98,13 @@ class CalendarApp(rumps.App):
         )
 
         if key and key.strip():
+            rumps.alert("🔄 확인 중...", "API 키를 검증하고 있어요. 잠시만 기다려주세요.")
+            valid, error = self.validate_api_key(key.strip())
+
+            if not valid:
+                rumps.alert("❌ API 키 오류", f"키가 유효하지 않아요.\n\n오류: {error}\n\naistudio.google.com/apikey 에서 키를 다시 확인해보세요.")
+                return
+
             self.config["api_key"] = key.strip()
 
             # 캘린더 자동 감지
@@ -106,6 +122,8 @@ class CalendarApp(rumps.App):
                         "캘린더 변경은 메뉴에서 할 수 있어요."
                     )
                 )
+            else:
+                rumps.alert("✅ API 키 변경 완료!", "새 API 키가 정상적으로 확인됐어요.")
         else:
             if is_first:
                 rumps.alert("⚠️ API 키 없이는 사용할 수 없어요.", "나중에 메뉴에서 설정할 수 있어요.")
@@ -239,12 +257,7 @@ class CalendarApp(rumps.App):
 
     @rumps.clicked("API 키 변경")
     def change_api_key(self, _):
-        key = ask_input("🔑 API 키 변경", "새 Gemini API 키를 붙여넣기 하세요:")
-
-        if key and key.strip():
-            self.config["api_key"] = key.strip()
-            save_config(self.config)
-            rumps.alert("✅ 변경 완료!", "새 API 키가 저장됐어요.")
+        self.prompt_api_key(is_first=False)
 
     @rumps.clicked("캘린더 변경")
     def change_calendar(self, _):
