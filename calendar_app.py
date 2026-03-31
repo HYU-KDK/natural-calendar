@@ -147,9 +147,19 @@ class CalendarApp(rumps.App):
     def process_events(self, text):
         try:
             client = Groq(api_key=self.config["api_key"])
-            today = datetime.now().strftime("%Y년 %m월 %d일 (%A)")
+            from datetime import timedelta
+            now = datetime.now()
+            korean_weekdays = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
+            today_str = now.strftime("%Y-%m-%d") + f" ({korean_weekdays[now.weekday()]})"
+            week_start = now - timedelta(days=now.weekday())
+            week_dates = "\n".join(
+                f"- {korean_weekdays[i]}: {(week_start + timedelta(days=i)).strftime('%Y-%m-%d')}"
+                for i in range(7)
+            )
+            tomorrow = (now + timedelta(days=1)).strftime("%Y-%m-%d")
+            day_after = (now + timedelta(days=2)).strftime("%Y-%m-%d")
 
-            prompt = f"""오늘은 {today}이야. 아래 텍스트에서 일정들을 추출해서 반드시 JSON 배열 형식으로만 답해줘. 다른 말은 절대 하지 마.
+            prompt = f"""오늘은 {today_str}이야. 아래 텍스트에서 일정들을 추출해서 반드시 JSON 배열 형식으로만 답해줘. 다른 말은 절대 하지 마.
 
 형식:
 [
@@ -157,10 +167,15 @@ class CalendarApp(rumps.App):
   ...
 ]
 
+이번주 날짜 (계산하지 말고 아래 값을 그대로 사용해):
+{week_dates}
+- 내일: {tomorrow}
+- 모레: {day_after}
+
 규칙:
 - date는 반드시 "2026-03-21" 같은 YYYY-MM-DD 숫자 형식으로만 써. 절대 "토요일", "월요일" 같은 한글을 쓰지 마.
-- "토요일"처럼 요일로 되어있으면 오늘 기준 이번주 해당 요일의 날짜로 계산해서 숫자로 변환해.
-- "내일", "모레"도 오늘 날짜 기준으로 계산해서 숫자로 써.
+- 요일로 표현된 날짜는 위의 이번주 날짜 표를 그대로 참조해서 변환해. 직접 계산하지 마.
+- "내일", "모레"도 위의 값을 그대로 사용해.
 - 시간이 없으면 time을 "09:00"으로 설정해줘.
 - "오후 7시부터 9시까지"처럼 종료 시간이 있으면 duration을 분 단위로 계산해줘.
 
@@ -218,6 +233,7 @@ class CalendarApp(rumps.App):
                 tell calendar "{calendar_name}"
                     set startDate to current date
                     set year of startDate to {start_dt.year}
+                    set day of startDate to 1
                     set month of startDate to {start_dt.month}
                     set day of startDate to {start_dt.day}
                     set hours of startDate to {start_dt.hour}
@@ -226,6 +242,7 @@ class CalendarApp(rumps.App):
 
                     set endDate to current date
                     set year of endDate to {end_dt.year}
+                    set day of endDate to 1
                     set month of endDate to {end_dt.month}
                     set day of endDate to {end_dt.day}
                     set hours of endDate to {end_dt.hour}
